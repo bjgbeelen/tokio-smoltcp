@@ -1,6 +1,6 @@
 use super::{reactor::Reactor, socket_allocator::SocketHandle};
 use futures::future::{self, poll_fn};
-use futures::{ready, Stream};
+use futures::{Stream, ready};
 pub use smoltcp::socket::{raw, tcp, udp};
 use smoltcp::wire::{IpAddress, IpEndpoint, IpProtocol, IpVersion};
 use std::mem::replace;
@@ -67,6 +67,9 @@ impl TcpListener {
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         Ok(self.local_addr)
     }
+    pub async fn connect(self, endpoint: IpEndpoint) -> io::Result<TcpStream> {
+        TcpStream::connect(self.reactor, self.local_addr.into(), endpoint).await
+    }
 }
 
 pub struct Incoming(TcpListener);
@@ -109,9 +112,11 @@ impl TcpStream {
             // avoid lock inversion deadlocks, but drop it before constructing
             // the TcpStream to avoid a second mutable borror of the reactor.
             let mut context = reactor.context();
-            reactor
-                .get_socket::<tcp::Socket>(*handle)
-                .connect(&mut context, remote_endpoint, local_endpoint)
+            reactor.get_socket::<tcp::Socket>(*handle).connect(
+                &mut context,
+                remote_endpoint,
+                local_endpoint,
+            )
         };
         connect_result.map_err(map_err)?;
 

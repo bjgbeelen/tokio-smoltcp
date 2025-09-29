@@ -4,8 +4,8 @@ use std::{
     io,
     net::{Ipv4Addr, Ipv6Addr, SocketAddr},
     sync::{
-        atomic::{AtomicU16, Ordering},
         Arc,
+        atomic::{AtomicU16, Ordering},
     },
 };
 
@@ -142,6 +142,17 @@ impl Net {
             addr.into(),
         )
         .await
+    }
+    pub fn tcp_connect_lazy(
+        &self,
+        addr: SocketAddr,
+    ) -> (
+        SocketAddr,
+        impl Future<Output = Result<TcpStream, std::io::Error>>,
+    ) {
+        let local_endpoint: SocketAddr = (self.ip_addr.address(), self.get_port()).into();
+        let promise = TcpStream::connect(self.reactor.clone(), local_endpoint.into(), addr.into());
+        (local_endpoint, promise)
     }
     /// This function will create a new UDP socket and attempt to bind it to the `addr` provided.
     pub async fn udp_bind(&self, addr: SocketAddr) -> io::Result<UdpSocket> {
